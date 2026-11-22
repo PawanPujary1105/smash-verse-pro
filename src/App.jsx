@@ -227,7 +227,7 @@ function PublicShell({ page, setPage, children, theme, onToggleTheme }) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <a className="brand" href="/" onClick={(event) => { event.preventDefault(); setPage('Dashboard') }}>
+        <a className="brand" href={import.meta.env.BASE_URL} onClick={(event) => { event.preventDefault(); setPage('Dashboard') }}>
           <div className="brand-mark" aria-hidden="true">SV</div>
           <div><strong>Smash Verse</strong><span>PRO</span></div>
         </a>
@@ -856,7 +856,7 @@ function AdminGate({ players, seasons, matches, dataError }) {
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="primary-button" disabled={busy} type="submit">{busy ? 'Checking…' : 'Continue'}</button>
       </form>
-      <a href="/">← Back to site</a>
+      <a href={import.meta.env.BASE_URL}>← Back to site</a>
     </div>
   )
 }
