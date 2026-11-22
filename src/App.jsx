@@ -18,6 +18,7 @@ const COLLECTIONS = {
   matches: 'smashVerseMatches',
 }
 const ADMIN_LOGIN_KEY = 'smashVerseAdminLoggedIn'
+const THEME_STORAGE_KEY = 'smashVerseTheme'
 const MATCH_POINT_LIMITS = { 11: 15, 15: 20, 21: 30 }
 
 function getMatchPoints(matchPoints) {
@@ -53,6 +54,9 @@ function Icon({ name }) {
     grid: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
     trophy: <><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4Z" /><path d="M7 6H4v1a4 4 0 0 0 4 4M17 6h3v1a4 4 0 0 1-4 4" /></>,
     players: <><circle cx="9" cy="8" r="3" /><circle cx="17" cy="9" r="2" /><path d="M3 20a6 6 0 0 1 12 0M14 16a5 5 0 0 1 7 4" /></>,
+    leaderboard: <><path d="M4 19V10h4v9M10 19V5h4v14M16 19v-7h4v7" /><path d="M2 21h20" /></>,
+    sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42" /></>,
+    moon: <path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z" />,
     admin: <><path d="M12 3 19 6v5c0 5-3 8-7 10-4-2-7-5-7-10V6l7-3Z" /><path d="M9 12h6M10 9h4v6h-4z" /></>,
   }
 
@@ -123,6 +127,49 @@ function LiveMatch({ match, players, matchesCount }) {
   )
 }
 
+function PointProgression({ match }) {
+  const points = (Array.isArray(match.pointHistory) ? match.pointHistory : []).filter((point) => (
+    point
+    && (point.player === 1 || point.player === 2)
+    && Number(point.pointNumber) > 0
+    && Number.isFinite(Number(point.pointNumber))
+    && Number.isFinite(Number(point.score1))
+    && Number.isFinite(Number(point.score2))
+  ))
+  const firstPointNumber = Number(points[0]?.pointNumber) || 1
+  const hasUnrecordedPoints = firstPointNumber > 1
+  const totalScore = (Number(match.score1) || 0) + (Number(match.score2) || 0)
+
+  return (
+    <div className="point-progression">
+      <div className="point-progression-heading">
+        <strong>Point-by-point progression</strong>
+        <span>{points.length} {points.length === 1 ? 'point' : 'points'} recorded</span>
+      </div>
+      {points.length === 0 ? (
+        <p className="point-progression-message">
+          {totalScore > 0
+            ? 'Point history is unavailable for points scored before tracking was added.'
+            : 'Points will appear here as they are scored.'}
+        </p>
+      ) : (
+        <>
+          {hasUnrecordedPoints && <p className="point-progression-message">Earlier points were scored before point-by-point tracking was added.</p>}
+          <ol className="point-progression-list">
+            {points.map((point, index) => (
+              <li className={`point-progression-item player-${point.player}`} key={`${point.pointNumber}-${index}`}>
+                <span className="point-progression-number">Point {point.pointNumber}</span>
+                <span className="point-progression-scorer">{point.player === 1 ? match.player1Name || 'Player 1' : match.player2Name || 'Player 2'} scored</span>
+                <strong>{point.score1} : {point.score2}</strong>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+    </div>
+  )
+}
+
 function SeasonCards({ seasons, matches }) {
   if (seasons.length === 0) {
     return <div className="empty-state">No seasons have been created yet.</div>
@@ -154,6 +201,10 @@ function SeasonCards({ seasons, matches }) {
                       {match.winnerName && <span className="public-season-winner">Winner: {match.winnerName}</span>}
                     </div>
                     <strong className="public-season-score">{match.score1 ?? 0} : {match.score2 ?? 0}</strong>
+                    <details className="public-point-progression">
+                      <summary>View point progression</summary>
+                      <PointProgression match={match} />
+                    </details>
                   </article>
                 ))}
               </div>
@@ -165,10 +216,11 @@ function SeasonCards({ seasons, matches }) {
   )
 }
 
-function PublicShell({ page, setPage, children }) {
+function PublicShell({ page, setPage, children, theme, onToggleTheme }) {
   const navigation = [
     ['Dashboard', 'grid'],
     ['Seasons', 'trophy'],
+    ['Leaderboard', 'leaderboard'],
     ['Players', 'players'],
   ]
 
@@ -187,6 +239,11 @@ function PublicShell({ page, setPage, children }) {
             </button>
           ))}
           <a className="admin-link" href={`${import.meta.env.BASE_URL}?admin=1`}><Icon name="admin" /><span>Admin</span></a>
+          <button className="theme-toggle" onClick={onToggleTheme} type="button" aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} aria-pressed={theme === 'dark'}>
+            <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+            <span>{theme === 'dark' ? 'Dark mode' : 'Light mode'}</span>
+            <span className="theme-toggle-track" aria-hidden="true"><i /></span>
+          </button>
         </nav>
       </aside>
       <main className="main-content">
@@ -203,11 +260,17 @@ function PublicShell({ page, setPage, children }) {
 }
 
 function PublicPages({ page, players, seasons, matches, dataError }) {
+  const [leaderboardSeasonId, setLeaderboardSeasonId] = useState('')
   const currentSeason = seasons.find((season) => season.isCurrent)
   const seasonMatches = currentSeason ? matches.filter((match) => match.seasonId === currentSeason.id) : []
   const liveMatch = seasonMatches.find((match) => match.status === 'Live')
   const leaderboard = buildLeaderboard(players, seasonMatches)
   const standingsByPlayer = new Map(leaderboard.map((standing) => [standing.player.id, standing]))
+  const leaderboardSeason = seasons.find((season) => season.id === leaderboardSeasonId) || currentSeason || seasons[0]
+  const selectedSeasonMatches = leaderboardSeason
+    ? matches.filter((match) => match.seasonId === leaderboardSeason.id)
+    : []
+  const selectedSeasonLeaderboard = buildLeaderboard(players, selectedSeasonMatches)
 
   if (dataError) {
     return <div className="data-error" role="alert">Couldn’t load app data: {dataError}</div>
@@ -251,6 +314,63 @@ function PublicPages({ page, players, seasons, matches, dataError }) {
                 </div>
               </article>
             ))}
+          </div>
+        )}
+      </section>
+    )
+  }
+
+  if (page === 'Leaderboard') {
+    return (
+      <section className="section-block">
+        <div className="section-heading leaderboard-page-heading">
+          <div><p className="eyebrow">STANDINGS · {leaderboardSeason?.name || 'NO SEASON SELECTED'}</p><h2>Leaderboard</h2></div>
+          <label className="leaderboard-season-picker">
+            Season
+            <select
+              aria-label="Select leaderboard season"
+              value={leaderboardSeason?.id || ''}
+              onChange={(event) => setLeaderboardSeasonId(event.target.value)}
+              disabled={seasons.length === 0}
+            >
+              {seasons.length === 0
+                ? <option value="">No seasons available</option>
+                : seasons.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}
+            </select>
+          </label>
+        </div>
+        {!leaderboardSeason ? <div className="empty-state">No seasons have been created yet.</div> : selectedSeasonLeaderboard.length === 0 ? <div className="empty-state">No players have been added yet.</div> : (
+          <div className="leaderboard">
+            <div className="standings-scroll">
+              <table className="standings-table" aria-label={`${leaderboardSeason?.name || 'Season'} player standings`}>
+                <thead><tr>
+                  <th scope="col">#</th>
+                  <th scope="col">Player</th>
+                  <th scope="col" title="Played">P</th>
+                  <th scope="col" title="Won">W</th>
+                  <th scope="col" title="Lost">L</th>
+                  <th scope="col" title="League Points">Pts</th>
+                  <th scope="col" title="Points For">GF</th>
+                  <th scope="col" title="Points Against">GA</th>
+                  <th scope="col" title="Difference">Diff</th>
+                </tr></thead>
+                <tbody>
+                  {selectedSeasonLeaderboard.map((standing, index) => (
+                    <tr key={standing.player.id}>
+                      <td>{index + 1}</td>
+                      <th scope="row">{standing.player.name}</th>
+                      <td>{standing.played}</td>
+                      <td>{standing.won}</td>
+                      <td>{standing.lost}</td>
+                      <td>{standing.points}</td>
+                      <td>{standing.gf}</td>
+                      <td>{standing.ga}</td>
+                      <td>{standing.gf - standing.ga}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </section>
@@ -472,6 +592,7 @@ function AdminDashboard({ players, seasons, matches, dataError, onLogout }) {
       matchPoints: Number(values.get('matchPoints')),
       score1: 0,
       score2: 0,
+      pointHistory: [],
       status: 'Live',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -495,6 +616,15 @@ function AdminDashboard({ players, seasons, matches, dataError, onLogout }) {
       const update = {
         score1: nextScore1,
         score2: nextScore2,
+        pointHistory: [
+          ...(Array.isArray(matchData.pointHistory) ? matchData.pointHistory : []),
+          {
+            pointNumber: nextScore1 + nextScore2,
+            player: field === 'score1' ? 1 : 2,
+            score1: nextScore1,
+            score2: nextScore2,
+          },
+        ],
         updatedAt: serverTimestamp(),
       }
 
@@ -648,6 +778,7 @@ function AdminDashboard({ players, seasons, matches, dataError, onLogout }) {
                   </article>
                 </div>
                 {scoringMatch.winnerName && <p className="scoring-winner" role="status">{scoringMatch.winnerName} wins!</p>}
+                <PointProgression match={scoringMatch} />
               </div>
             ) : (
               <div className="admin-season-list">
@@ -732,16 +863,22 @@ function AdminGate({ players, seasons, matches, dataError }) {
 
 function App() {
   const [page, setPage] = useState('Dashboard')
+  const [theme, setTheme] = useState(() => localStorage.getItem(THEME_STORAGE_KEY) === 'light' ? 'light' : 'dark')
   const path = window.location.pathname.replace(/\/+$/, '')
   const isAdminRoute = path === '/admin' || new URLSearchParams(window.location.search).get('admin') === '1'
   const { players, seasons, matches, error: dataError } = usePublicData()
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    localStorage.setItem(THEME_STORAGE_KEY, theme)
+  }, [theme])
 
   if (isAdminRoute) {
     return <AdminGate players={players} seasons={seasons} matches={matches} dataError={dataError} />
   }
 
   return (
-    <PublicShell page={page} setPage={setPage}>
+    <PublicShell page={page} setPage={setPage} theme={theme} onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}>
       <PublicPages page={page} players={players} seasons={seasons} matches={matches} dataError={dataError} />
     </PublicShell>
   )
