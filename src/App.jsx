@@ -186,7 +186,7 @@ function PublicShell({ page, setPage, children }) {
               <span>{label}</span>
             </button>
           ))}
-          <a className="admin-link" href="/admin"><Icon name="admin" /><span>Admin</span></a>
+          <a className="admin-link" href={`${import.meta.env.BASE_URL}?admin=1`}><Icon name="admin" /><span>Admin</span></a>
         </nav>
       </aside>
       <main className="main-content">
@@ -732,7 +732,8 @@ function AdminGate({ players, seasons, matches, dataError }) {
 
 function App() {
   const [page, setPage] = useState('Dashboard')
-  const isAdminRoute = window.location.pathname.replace(/\/+$/, '') === '/admin'
+  const path = window.location.pathname.replace(/\/+$/, '')
+  const isAdminRoute = path === '/admin' || new URLSearchParams(window.location.search).get('admin') === '1'
   const { players, seasons, matches, error: dataError } = usePublicData()
 
   if (isAdminRoute) {

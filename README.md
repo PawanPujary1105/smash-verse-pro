@@ -1,6 +1,6 @@
 # Smash Verse Pro
 
-React and Vite frontend for tournament listings, player rankings, statistics, and live match scores. Public pages read from Firestore.
+React and Vite frontend for player profiles, season standings, and live match scores. Public pages read from Firestore.
 
 ## Run locally
 
@@ -55,3 +55,9 @@ match /smashVerseTournaments/{id} {
 For protected in-app editing, use Firebase Authentication or a trusted server-side backend.
 
 When changing Firestore rules in the shared project, merge collection-specific rules into the existing rules and review broad wildcard grants. Public pages need read access to public collections and the settings collection. If you choose to allow client writes, restrict them to the Smash Verse collections so they do not affect the chess app's data.
+
+## Deploy on GitHub Pages
+
+The `.github/workflows/deploy.yml` workflow builds and deploys the site whenever changes are pushed to `main`. In the GitHub repository, open **Settings → Pages** and set the build and deployment source to **GitHub Actions**. After the workflow succeeds, the site is available at `https://<owner>.github.io/<repository>/`.
+
+The Vite config automatically sets the Pages base path from the repository name. The Admin link uses a query URL (`?admin=1`) so it works with GitHub Pages static hosting.
